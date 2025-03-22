@@ -1,89 +1,51 @@
-import express from "express";
-import axios from "axios";
-import dotenv from "dotenv";
-dotenv.config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const axios = require('axios');
+const FormData = require('form-data');
 
 const app = express();
-app.use(express.json());
-const port = process.env.PORT || 1000;
+const PORT = process.env.PORT || 10000;
 
 const IMGUR_CLIENT_ID = process.env.IMGUR_CLIENT_ID;
 const IMGUR_ACCESS_TOKEN = process.env.IMGUR_ACCESS_TOKEN;
 
-// POST endpoint for uploading images
-app.post("/upload-images", async (req, res) => {
-  const { image_urls, album_hash } = req.body;
-
-  if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
-    return res.status(400).json({ error: "No image URLs provided." });
-  }
-
-  if (!album_hash) {
-    return res.status(400).json({ error: "Missing album_hash." });
-  }
-
-  const uploadedHashes = [];
-
-  for (let i = 0; i < image_urls.length; i++) {
-    const image_url = image_urls[i];
-
-    try {
-      // Upload image to Imgur
-      const uploadResponse = await axios.post(
-        "https://api.imgur.com/3/image",
-        new URLSearchParams({
-          image: image_url,
-          type: "url"
-        }),
-        {
-          headers: {
-            Authorization: `Client-ID ${IMGUR_CLIENT_ID}`,
-            "Content-Type": "application/x-www-form-urlencoded"
-          }
-        }
-      );
-
-      const uploadedHash = uploadResponse.data.data.id;
-      uploadedHashes.push(uploadedHash);
-
-      // Add image to album
-      await axios.post(
-        `https://api.imgur.com/3/album/${album_hash}/add`,
-        new URLSearchParams({ [`ids[]`]: uploadedHash }),
-        {
-          headers: {
-            Authorization: `Bearer ${IMGUR_ACCESS_TOKEN}`,
-            "Content-Type": "application/x-www-form-urlencoded"
-          }
-        }
-      );
-
-    } catch (err) {
-      console.error("❌ Failed to upload image or add to album:", image_url, err.response?.data || err.message);
-    }
-  }
-
-  const albumLink = `https://imgur.com/a/${album_hash}`;
-  return res.json({
-    message: `✅ ${uploadedHashes.length} image(s) uploaded successfully`,
-    album: albumLink,
-    uploaded: uploadedHashes
-  });
-});
+app.use(bodyParser.json());
 
 app.post('/upload', async (req, res) => {
-  console.log("REQ BODY:", req.body);  // Log incoming data
+    const { image_urls, album_hash } = req.body;
 
-  const { image_urls, album_hash } = req.body;
+    if (!image_urls || !album_hash) {
+        return res.status(400).json({ error: 'Missing image_urls or album_hash' });
+    }
 
-  if (!image_urls || !album_hash) {
-    console.error("❌ Missing data");
-    return res.status(400).send({ error: "Missing image_urls or album_hash" });
-  }
+    const urls = image_urls.split(',').map(url => url.trim());
 
-  // Continue...
+    // Respond right away so Voiceflow doesn't timeout
+    res.status(200).json({ message: 'Uploading started' });
+
+    for (const url of urls) {
+        try {
+            const form = new FormData();
+            form.append('image', url);
+            form.append('type', 'url');
+            form.append('album', album_hash);
+
+            await axios.post('https://api.imgur.com/3/image', form, {
+                headers: {
+                    ...form.getHeaders(),
+                    Authorization: `Client-ID ${IMGUR_CLIENT_ID}`  // or Bearer token
+                }
+            });
+
+            console.log(`✅ Uploaded to album: ${url}`);
+        } catch (error) {
+            console.error(`❌ Failed to upload ${url}:`, error.response?.data || error.message);
+        }
+    }
+
+    console.log('✅ All uploads attempted.');
 });
 
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server ready on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 Server ready on port ${PORT}`);
+});
