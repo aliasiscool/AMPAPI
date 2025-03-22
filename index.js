@@ -1,73 +1,50 @@
-const express = require("express");
-const axios = require("axios");
-const bodyParser = require("body-parser");
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
+
+dotenv.config();
 
 const app = express();
-app.use(bodyParser.json());
+app.use(cors());
+app.use(express.json({ limit: "50mb" }));
 
-const IMGUR_CLIENT_ID = process.env.IMGUR_CLIENT_ID;
-const IMGUR_ACCESS_TOKEN = process.env.IMGUR_ACCESS_TOKEN;
-
-const delay = (ms) => new Promise(res => setTimeout(res, ms));
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 app.post("/upload", async (req, res) => {
-  const { image_urls, album_hash } = req.body;
+  try {
+    const { image_urls = [], folder = "default_album" } = req.body;
 
-  if (!image_urls || !album_hash) {
-    return res.status(400).json({ error: "Missing image_urls or album_hash" });
-  }
-
-  const imageArray = image_urls.split(",").map(url => url.trim());
-  const uploadedImageIds = [];
-
-  for (const url of imageArray) {
-    try {
-      const uploadRes = await axios.post(
-        "https://api.imgur.com/3/image",
-        new URLSearchParams({
-          image: url,
-          type: "url",
-        }),
-        {
-          headers: {
-            Authorization: `Client-ID ${IMGUR_CLIENT_ID}`,
-          },
-        }
-      );
-
-      const imageId = uploadRes.data.data.id;
-      uploadedImageIds.push(imageId);
-      console.log("✅ Uploaded:", imageId);
-
-      await axios.post(
-        `https://api.imgur.com/3/album/${album_hash}/add`,
-        new URLSearchParams({ "ids[]": imageId }),
-        {
-          headers: {
-            Authorization: `Bearer ${IMGUR_ACCESS_TOKEN}`,
-          },
-        }
-      );
-
-      console.log(`✅ Added image ${imageId} to album`);
-      await delay(1000); // wait 1 second between uploads
-
-    } catch (err) {
-      console.error("❌ Upload/Add failed for", url);
-      console.error(err.response?.data || err.message);
+    if (!Array.isArray(image_urls) || image_urls.length === 0) {
+      return res.status(400).json({ error: "No image URLs provided." });
     }
-  }
 
-  return res.json({
-    success: true,
-    uploaded: uploadedImageIds.length,
-    album_url: `https://imgur.com/a/${album_hash}`,
-  });
+    const uploadPromises = image_urls.map((url) =>
+      cloudinary.uploader.upload(url, {
+        folder,
+      })
+    );
+
+    const results = await Promise.all(uploadPromises);
+
+    const uploadedLinks = results.map((r) => r.secure_url);
+
+    return res.status(200).json({
+      message: "✅ Images uploaded successfully",
+      gallery: uploadedLinks,
+    });
+  } catch (err) {
+    console.error("Upload Error:", err);
+    return res.status(500).json({ error: "Upload failed", details: err });
+  }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🔥 Server listening on port ${PORT}`);
+  console.log(`🚀 Server live on port ${PORT}`);
 });
-
-
