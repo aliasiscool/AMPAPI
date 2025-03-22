@@ -1,9 +1,8 @@
-import express from "express";
-import axios from "axios";
-import bodyParser from "body-parser";
+const express = require("express");
+const axios = require("axios");
+const bodyParser = require("body-parser");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
 app.use(bodyParser.json());
 
 const IMGUR_CLIENT_ID = process.env.IMGUR_CLIENT_ID;
@@ -23,7 +22,6 @@ app.post("/upload", async (req, res) => {
 
   for (const url of imageArray) {
     try {
-      // Upload the image
       const uploadRes = await axios.post(
         "https://api.imgur.com/3/image",
         new URLSearchParams({
@@ -41,7 +39,6 @@ app.post("/upload", async (req, res) => {
       uploadedImageIds.push(imageId);
       console.log("✅ Uploaded:", imageId);
 
-      // Add to album
       await axios.post(
         `https://api.imgur.com/3/album/${album_hash}/add`,
         new URLSearchParams({ "ids[]": imageId }),
@@ -72,4 +69,5 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🔥 Server listening on port ${PORT}`);
 });
+
 
