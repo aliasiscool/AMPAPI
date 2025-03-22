@@ -70,5 +70,19 @@ app.post("/upload-images", async (req, res) => {
   });
 });
 
+app.post('/upload', async (req, res) => {
+  console.log("REQ BODY:", req.body);  // Log incoming data
+
+  const { image_urls, album_hash } = req.body;
+
+  if (!image_urls || !album_hash) {
+    console.error("❌ Missing data");
+    return res.status(400).send({ error: "Missing image_urls or album_hash" });
+  }
+
+  // Continue...
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server ready on port ${PORT}`));
