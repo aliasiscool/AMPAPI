@@ -5,6 +5,7 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+const port = process.env.PORT || 1000;
 
 const IMGUR_CLIENT_ID = process.env.IMGUR_CLIENT_ID;
 const IMGUR_ACCESS_TOKEN = process.env.IMGUR_ACCESS_TOKEN;
